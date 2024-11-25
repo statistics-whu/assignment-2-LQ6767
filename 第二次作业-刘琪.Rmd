@@ -1,0 +1,372 @@
+---
+title: "第二次作业"
+author: "刘琪"
+date: "`r Sys.Date()`"
+documentclass: ctexart
+geometry: "left=2.5cm,right=2cm,top=3cm,bottom=2.5cm"
+output: 
+  pdf_document:
+    fig_caption: yes
+    latex_engine: xelatex
+    number_sections: yes
+    toc: yes
+---
+```{r setup, include = FALSE,echo = FALSE}
+knitr::opts_chunk$set(echo = FALSE,error = FALSE, warning = FALSE, message = FALSE,
+                      out.width = "100%", split = FALSE, fig.align = "center",dev="cairo_pdf",fig.pos='H',comment = "#>")
+
+#load library
+library(tidyverse)
+library(kableExtra)
+library(lubridate)
+library(scales)
+library(plotly)
+library(patchwork)
+library(ggrepel)
+library(ggplot2)
+library(broom) # 以 tidy 的格式展示
+library(modelr) # 使用 add_predictions() 函数来添加模型预测到数据框
+library(skimr) # 描述性统计用
+library(knitr) # 描述性统计用
+library(infer) # 置信区间用
+library(car) # 回归模型的诊断和检验的函数。
+```
+
+
+
+# Question #1: BigBangTheory. (Attached Data: BigBangTheory)
+```{r}
+data_q1 <- read_csv(str_c("C:/Users/86136/Desktop/zy/BigBangTheory.csv")) %>% rename(viewers = `Viewers (millions)`,                                                         air_date = `Air Date`) %>% mutate(air_date = mdy(air_date))# read data
+```
+
+a. 观众人数的最小值为 `r min(data_q1$viewers)`, 观众人数的最大值为 `r max(data_q1$viewers)`。
+
+b. 平均数为`r mean(data_q1$viewers)`; 中位数为 `r median(data_q1$viewers)`;众数为`r names(which.max(table(data_q1$viewers)))`。
+
+c. 第一四分位数为 `r quantile(data_q1$viewers,probs = 0.25)`;第三四分位数 为`r quantile(data_q1$viewers,probs = 0.75)`。
+
+d. 从下图可中，我们无法发现2011-2012季度观众人数变化的任何趋势。
+
+```{r plot, fig.cap= "Plot between date and viewers"}
+ggplot(data_q1,aes(air_date,viewers)) +
+         geom_point() +
+         geom_line(color="red") +
+  scale_x_date(breaks = data_q1$air_date) +
+  theme(axis.text.x = element_text(angle = 90))
+```
+
+
+
+# Question #2: NBAPlayerPts. (Attached Data: NBAPlayerPts)
+```{r}
+data_q2 <- read_csv(str_c("C:/Users/86136/Desktop/zy/NBAPlayerPts.csv")) 
+a <- table(cut_width(data_q2$PPG,2,boundary = 10))/50
+cumsum(a)
+```
+a. 频率分布:  `r table(cut_width(data_q2$PPG,2,boundary = 10))`
+
+b. 相对频率分布:  `r table(cut_width(data_q2$PPG,2,boundary = 10))/50`
+
+c. 累积百分比频率分布: \\n
+`r cumsum(table(cut_width(data_q2$PPG,2,boundary = 10))/50)`
+
+d. 平均得分直方图:
+```{r}
+ggplot(data_q2,aes(PPG)) + 
+  geom_histogram(binwidth = 5,color = "black",fill="white") 
+```
+e. 数据看起来向右偏斜,因为分布的尾部在右侧延伸。
+f. 1-78% = 22%.
+
+
+
+# Question #3
+a. 这次调查中使用的样本大小为 `r ceiling(500^2/20^2)`。
+
+b.样本量很大，所以样本均值的分布是正态分布。 点估计在总体均值±25以内的概率是 `r 1- 2*(1-pnorm(25/20))`.。
+
+
+
+# Question #4:Young Professional Magazine (Attached Data: Professional)
+管理报告：
+a. 描述性统计数据如下。
+```{r}
+data_q4 <- read_csv(str_c("C:/Users/86136/Desktop/zy/Professional.csv")) %>% 
+  rename(age = Age,
+         gender = Gender,
+    real_estate = `Real Estate Purchases?`,
+    investments = `Value of Investments ($)`,
+    num_trans = `Number of Transactions`,
+    has_broadband = `Broadband Access?`,
+    income = `Household Income ($)`,
+    have_children = `Have Children?`) %>% 
+  select(age:have_children) %>% 
+  mutate(across(is.character, as.factor))
+
+# 描述性统计
+
+skimr::skim(data_q4) %>% 
+kable() %>% 
+kable_styling()
+```
+
+b. 为订阅者的平均年龄95%置信区间为30岁至31岁；
+家庭收入95%置信区间为71079美元至77840美元。
+```{r}
+# 计算平均值和标准差
+mean_age <- mean(data_q4$age)
+sd_age <- sd(data_q4$age)
+n_age <- length(data_q4$age)
+
+mean_income <- mean(data_q4$income)
+sd_income <- sd(data_q4$income)
+n_income <- length(data_q4$income)
+
+# 计算标准误差
+se_age <- sd_age / sqrt(n_age)
+se_income <- sd_income / sqrt(n_income)
+
+# 确定t值（这里使用95%置信水平，自由度为n-1）
+t_value <- qt(0.975, df = n_age - 1)  # 对于年龄
+t_value_income <- qt(0.975, df = n_income - 1)  # 对于收入
+
+# 计算95%置信区间
+ci_age <- c(mean_age - t_value * se_age, mean_age + t_value * se_age)
+ci_income <- c(mean_income - t_value_income * se_income, mean_income + t_value_income * se_income)
+
+# 打印结果
+cat("95% CI for average age:", ci_age, "\n")
+cat("95% CI for average income:", ci_income, "\n")
+```
+
+
+
+c.家中有宽带接入的订阅者比例95%置信区间为58%至67%；
+有孩子的订阅者比例95%置信区间为48%至58%。
+```{r}
+# 对拥有宽带接入的订阅者比例进行假设检验，并获取95%置信区间
+broadband_test <- prop_test(data_q4, response = has_broadband, success = "Yes")
+# 对有孩子的订阅者比例进行假设检验，并获取95%置信区间
+children_test <- prop_test(data_q4, response = have_children, success = "Yes")
+
+# 打印结果
+print(broadband_test)
+print(children_test)
+```
+
+d.我认为这本杂志是在线经纪人的良好广告渠道，有数据可以发现几乎全部的订阅者除了他们的房产外还有金融投资，平均金额达到`r mean(data_q4$investments)`美元，最高者达到了133400美元。其次是股票、债券和共同基金的交易数量，几乎全部的订阅者都有过交易次数，平均每年大约是`r mean(data_q4$num_trans)`次，而有些订阅者的交易数量远超这个数字。
+
+e.我认为这本杂志是为销售教育软件和儿童电脑游戏的公司做广告的好地方，调查结果使我们发现估计订阅者的平均年龄在30岁和31岁直接，并且53.41%的订阅者有孩子。由订阅者的年龄普遍偏年轻，其中有小孩的又占多数，我们可以推断这些订阅者的小孩都很小，他们对于教育软件和儿童电脑游戏会有一定需求。可以得出结论，《Young Professional Magazine》的订阅者是销售儿童教育软件和电脑游戏公司的一个很好的目标市场。
+
+f.从调查结果来看，我认为订阅者最会感兴趣的文章类型应该是金融类、投资类的文章，因为这些订阅者或订阅者的家庭中几乎全部都有金融投资。其次感兴趣会是育儿方面的文章，因为订阅者平均年龄很年轻，且超过半数都有小孩。再者会是关于房地产的文章，因为接近半数的订阅者在未来两年内有买房计划。
+
+
+
+# Question #5: Quality Associate, Inc. (Attached Data: Quality)
+```{r}
+data_q5 <- read_csv(str_c("C:/Users/86136/Desktop/zy/Quality.csv")) %>% 
+  rename(s1 = `Sample 1`,
+         s2 = `Sample 2`,
+         s3 = `Sample 3`,
+         s4 = `Sample 4`)
+
+
+cal_p <- function(vec,miu,sigma,n){
+  a <- mean(vec) - miu
+  if(a >=0) {return(2*(1-pnorm(a/(sigma/sqrt(n)))))} 
+    else
+      return(2*pnorm(a/(sigma/sqrt(n))))
+}
+```
+
+a. 每个测试的p值如下:
+```{r}
+data_q5 %>% 
+  map_dbl(cal_p,miu = 12, sigma = 0.21, n = 30)
+```
+你可以使用区间估计来检验假设
+```{r}
+z_interval <- function(miu,sigma,prob,n) {return(c(miu + qnorm(prob) * sigma / sqrt(n), miu - qnorm(prob) * sigma / sqrt(n)))}
+z_interval(12,0.21,0.01,30)
+map(data_q5,mean)
+```
+不需要采取措施。
+
+b. 四个样本的标准差如下：
+```{r}
+map(data_q5,sd)
+```
+可以合理地假设标准差是0.21。
+
+c.样本均值为12.
+```{r}
+z_interval(12,0.21,0.01,30)
+```
+d. 将显著性水平由0.01提高至0.05：
+```{r}
+z_interval(12,0.21,0.05,30)
+```
+随着显著性水平的提高，第一类错误会增加。
+
+
+
+# Question #6
+```{r}
+data_q6 <- read_csv(str_c("C:/Users/86136/Desktop/zy/Occupancy.csv"), skip = 1) %>% rename(mar_2007 = `March 2007`, mar_2008 = `March 2008`) %>% mutate(across(is.character,as.factor))
+```
+
+a. 估计2007年3月第一周出租的比例为35%，2008年3月第一周出租比例为47%。
+```{r}
+sum(data_q6$mar_2007 %in% c("Yes"))/200
+sum(data_q6$mar_2008 %in% c("Yes"))/150
+```
+b. 比例差异的95%置信区间
+```{r}
+pa <- sum(data_q6$mar_2007 %in% c("Yes"))/200
+pb <- sum(data_q6$mar_2008 %in% c("Yes"))/150
+e <- qnorm(0.975) * sqrt(pa*(1-pa)/200 + pb*(1-pb)/150)
+```
+比例差异的95%置信区间为： `r c(pa-pb-e,pa-pb+e)`.
+
+c. 根据你的发现，2008年3月的租赁率似乎比一年前有所上升。
+
+
+
+# Question #7: ir Force Training Program (data file: Training)
+```{r}
+data_q7 <- read_csv(str_c("C:/Users/86136/Desktop/zy/Training.csv")) 
+```
+
+a. 
+```{r}
+skimr::skim(data_q7) %>% 
+  kable() %>% 
+  kable_styling()
+```
+由上表可知，两种方法的训练时间的平均值相差不大，均为75小时。但是标准差相差较大，说明通过文本进行学习的学习时间的分散程度较大。
+
+b.
+```{r}
+t.test(data_q7$Current,data_q7$Proposed)
+```
+两种方法的学习时间，均值相差不大。在95%的置信区间内未发现差异，均值相同。
+
+c.
+```{r}
+map(data_q7,sd)
+map(data_q7,var)
+var.test(data_q7$Current,data_q7$Proposed)
+```
+使用指导文本进行学习，标准差为3.9，方差为16；
+使用提议中的计算机辅助教学方法，标准差为2.5，方差为6.3.
+两种标准差或方差是不同的。使用指导文本进行学习，学习时间的分散程度较大。
+
+d.两种方法学习完成时间的均值非常接近。但是提议的方法具有显著较低的方差。在提议的方法下，多数学生可能在更接近的时间内完成培训。方便把握整体学习进度。
+
+e. 当前仅根据学习时间，作出结论过于草率。建议收集两种方法下学习量、学习效果和学生学习满意度的数据。或者进行考试，统计两种不同方法的考试分数。通过以上数据，综合分析两种学习方法的好坏再作结论。
+时间数据支持转向提议的方法。然而，提议方法的培训质量是否与当前方法相同或更好？两组都可以在培训计划结束时进行考试。对考试成绩的分析将确定这些计划在提供的学习方法上是否相似或不同。在最终决定采用提议的方法之前，应该进行这项分析。
+
+
+# Question #8
+
+```{r}
+data_q8 <- read_csv(str_c("C:/Users/86136/Desktop/zy/Camry.csv")) %>% 
+  rename(miles = `Miles (1000s)`,
+         price = `Price ($1000s)`)
+```
+
+a. 散点图如下（x轴里程数，y轴价格）:
+```{r}
+data_q8 %>% 
+  ggplot() +
+  geom_point(aes(miles,price))
+```
+b.根据图中的点分布显示，随着里程数的增加，价格呈现下降趋势。这表明里程数与价格之间存在负相关关系；数据点在低里程数（20-40千英里）时价格较高，随着里程数增加，价格逐渐降低。在高里程数（80-100千英里）区域，价格下降得更为明显。虽然数据点的分布并不完全沿着一条直线，但整体趋势可以近似地用一条直线来描述，这表明里程数与价格之间可能存在线性关系。在低里程数区域，有一些点的价格明显高于其他点，这可能是由于车辆的其他因素（如车况、额外配置等）导致的。
+
+c.
+```{r}
+lm_camry <- lm(price ~ miles, data = data_q8)
+
+summary(lm_camry)
+```
+回归方程为; 
+$$ Price = 16.470 - 0.059 * miles $$
+d. 显著关系0.05的显著性水平: $p-value = 0.000348 < α = .05$
+
+e.我觉得并没有提供良好的拟合度，因为并没有考虑车况、配置等其他因素。
+
+f.估计回归方程的斜率是 -0.059。因此，x值每增加一个单位，y值就会相应减少0.059。由于数据是以千为单位记录的，汽车里程表上每增加1000英里，预计价格将下降59.0美元。
+
+g.行驶了60,000英里的二手2007年款凯美瑞，根据拟合的回归方程，价格为12942美元，这会是一个参考价格，通过这个价格为起点，再考虑车况、配置等其他因素进一步报价。
+
+
+# Question #9
+a.流失等于0和流失等于1的情况之间的比较进行可视化探索。
+```{r}
+
+we_data <- readxl::read_xlsx(str_c("C:/Users/86136/Desktop/zy/WE.xlsx")) %>% 
+  set_names("id","churn","happy_index","chg_hi","support","chg_supprt",
+            "priority","chg_priority","log_in_fre","chg_blog_fre","chg_vis","y_age","chg_interval")
+
+glimpse(we_data)
+
+we_data %>% 
+  select(-id) %>% 
+  group_by(churn) %>% 
+  group_modify(~{
+    .x %>% 
+      purrr::map_dfc(mean, na.rm = TRUE)
+  }) %>% ungroup() %>% 
+  kable() %>% 
+  kable_styling()
+```
+在所有11个指标中，流失与未流失的客户之间存在差异。
+未流失的客户的“当月客户幸福指数”较高，为89，而流失的客户的“当月客户幸福指数”则较低，为63。
+未流失的客户在“客户幸福指数相比上月变化”上为5.5，而流失的客户为-3.7，这可能意味着流失的客户经历了负面的变化。
+在“当月客户支持”上，未流失的客户为0.72，而流失的客户为0.37，表明流失的客户可能获得的支持较少。
+“登录频率”也显示出差异，未流失的客户登录频率为16.1，而流失的客户为8.1。
+
+b.使用 t.test 来检查这些差异是否具有统计学意义
+
+```{r}
+we_data %>% 
+  select(-id) %>% 
+  pivot_longer(cols = -churn, names_to = "variable", values_to = "value") %>% 
+  group_nest(variable) %>% 
+  mutate(t.test = map(data, ~ tidy(t.test(value ~ churn, data = .x)))) %>% 
+  unnest(t.test) %>% 
+  select(-data) %>% 
+  kable() %>% kable_styling()
+```
+
+根据表格，我们可以得出以下结论：
+除了“客户支持相比上月的变化”和“服务优先级相比上月的变化”，其他所有指标的差异都是显著的。这意味着在这些指标上，流失客户与未流失客户之间存在统计学上的显著差异。对于“客户支持相比上月的变化”和“服务优先级相比上月的变化”，我们没有足够的证据表明流失与未流失客户之间存在显著差异。这可能意味着这些指标的变化对于客户是否流失的影响不大，或者这种影响在统计上不够显著。
+
+c. 以流失为因变量，以当月客户幸福指数、客户幸福指数相比上月变化、当月客户支持、当月服务优先级、当月登录次数、博客数相比上月的变化、访问次数相比上月的增加、客户使用期限、访问间隔变化为自变量建立回归方程
+
+```{r}
+
+set.seed(6347)
+we_logit<-glm(churn ~ happy_index + chg_hi + support + priority + log_in_fre
+              + chg_blog_fre + chg_vis  + y_age + chg_interval,
+             data = we_data,
+             family = binomial(link = "logit"))
+summary(we_logit)
+
+library(car)
+vif(we_logit)
+```
+
+
+d. 根据以上回归方程，流失可能性最大的前100名用户ID列表如下：
+```{r}
+we_data %>% 
+  add_predictions(we_logit,type = "response") %>% 
+  arrange(desc(pred)) %>% 
+  filter(churn == 0) %>% 
+  slice_head(n=100) %>% 
+  kable() %>% kable_styling()
+```
+
+
+
